@@ -1,9 +1,11 @@
 import asyncio
+import datetime
+
 import aiohttp
 from more_itertools import chunked
 from models import Session, DeclarativeBase, PG_DSN, SwapiPeople, init_db
 
-MAX_CHUNK = 5
+MAX_CHUNK = 10
 
 
 async def extract_names(list_data):
@@ -20,7 +22,7 @@ async def insert_people(people_list):
     async with Session() as session:
         async with session.begin():
             for person in people_list:
-                if person.get('birth_year'):
+                if person.get('name'):
                     person_data = {
                         'name': person['name'],
                         'height': person['height'],
@@ -50,14 +52,17 @@ async def main():
     await init_db()
     tasks = []
     async with Session() as session:
-        for person_id_chunk in chunked(range(1, 90), MAX_CHUNK):
+        for person_id_chunk in chunked(range(1, 85), MAX_CHUNK):
             coros = [get_person(session, person_id) for person_id in person_id_chunk]
             results = await asyncio.gather(*coros)
             tasks.append(insert_people(results))
+        await asyncio.gather(*tasks)
 
         await session.close()
         all_tasks_set = asyncio.all_tasks() - {asyncio.current_task()}
         await asyncio.gather(*all_tasks_set)
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(main())
+    start = datetime.datetime.now()
+    asyncio.run(main())
+    print(datetime.datetime.now() - start)
